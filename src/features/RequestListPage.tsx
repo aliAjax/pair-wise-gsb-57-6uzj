@@ -48,6 +48,7 @@ import {
   type RequestType,
 } from '@/lib/schemas'
 import { deadlineState, templateName } from '@/services/workflow'
+import { getEffectiveVersion } from '@/services/reconciliation'
 
 const initialForm = {
   requesterName: '',
@@ -74,6 +75,9 @@ export function RequestListPage() {
   const store = useWorkspaceStore()
 
   if (isLoading || !data) return <Box className="panel">正在加载请求列表...</Box>
+
+  // 登记新请求时的系统选择同样只认当前有效清单版本。
+  const effectiveSystems = getEffectiveVersion(data)?.systems ?? data.systems
 
   const filtered = data.requests.filter((request) => {
     const keyword = store.requestSearch.toLowerCase()
@@ -293,7 +297,7 @@ export function RequestListPage() {
             <FormControl mt="4" isRequired>
               <FormLabel>相关系统</FormLabel>
               <HStack wrap="wrap">
-                {data.systems.map((system) => (
+                {effectiveSystems.map((system) => (
                   <Checkbox
                     key={system.id}
                     isChecked={form.affectedSystemIds.includes(system.id)}

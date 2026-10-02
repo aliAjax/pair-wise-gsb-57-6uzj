@@ -15,17 +15,28 @@ import {
 } from '@/services/requestService'
 import { createInitialState } from '@/services/mockData'
 import {
+  discardInventoryVersion,
+  publishInventoryVersion,
+  retryBatch,
+  submitInventoryChange,
+  type ReconcileResult,
+} from '@/services/reconciliation'
+import {
   assignTaskInputSchema,
   closeRequestInputSchema,
   commentInputSchema,
   conflictInputSchema,
   createRequestInputSchema,
+  discardInventoryInputSchema,
   evidenceInputSchema,
   extendRequestInputSchema,
   identityInputSchema,
+  publishInventoryInputSchema,
   recordExportInputSchema,
   resolveConflictInputSchema,
+  retryBatchInputSchema,
   saveRequestInputSchema,
+  submitInventoryInputSchema,
   taskActionInputSchema,
 } from '@/lib/schemas'
 import type { WorkspaceState } from '@/types/domain'
@@ -44,9 +55,56 @@ function execute(operation: () => WorkspaceState): WorkspaceState {
   }
 }
 
+function executeReconcile(operation: () => ReconcileResult): ReconcileResult {
+  try {
+    return operation()
+  } catch (error) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: error instanceof Error ? error.message : '清单发布处理失败',
+    })
+  }
+}
+
 export const appRouter = t.router({
   workspace: t.router({
     defaults: publicProcedure.query(() => createInitialState()),
+  }),
+  inventory: t.router({
+    submit: publicProcedure
+      .input(submitInventoryInputSchema)
+      .mutation(({ input }) =>
+        executeReconcile(() =>
+          submitInventoryChange(input.state, {
+            baseVersionId: input.baseVersionId,
+            changeSummary: input.changeSummary,
+            systems: input.systems,
+            operator: input.operator,
+          }),
+        ),
+      ),
+    publish: publicProcedure
+      .input(publishInventoryInputSchema)
+      .mutation(({ input }) =>
+        executeReconcile(() =>
+          publishInventoryVersion(
+            input.state,
+            input.versionId,
+            input.operator,
+            input.simulateFailure,
+          ),
+        ),
+      ),
+    retry: publicProcedure
+      .input(retryBatchInputSchema)
+      .mutation(({ input }) =>
+        executeReconcile(() => retryBatch(input.state, input.batchId, input.operator, input.simulateFailure)),
+      ),
+    discard: publicProcedure
+      .input(discardInventoryInputSchema)
+      .mutation(({ input }) =>
+        execute(() => discardInventoryVersion(input.state, input.versionId, input.operator)),
+      ),
   }),
   request: t.router({
     create: publicProcedure

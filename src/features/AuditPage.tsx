@@ -25,6 +25,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { useRecordExportMutation, useWorkspaceQuery } from '@/lib/hooks'
 import { clearWorkspace } from '@/lib/localStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { getEffectiveVersion } from '@/services/reconciliation'
 
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([`\ufeff${content}`], { type })
@@ -66,15 +67,49 @@ export function AuditPage() {
   const workspace = data
 
   function sanitizedPackage() {
+    const effectiveVersion = getEffectiveVersion(workspace)
     return {
       exportedAt: new Date().toISOString(),
       policy: '用户隐私权利请求履约操作规范 v1',
+      effectiveInventoryVersion: effectiveVersion
+        ? {
+            id: effectiveVersion.id,
+            versionNo: effectiveVersion.versionNo,
+            publishedAt: effectiveVersion.publishedAt,
+            publishedBy: effectiveVersion.publishedBy,
+            changeSummary: effectiveVersion.changeSummary,
+          }
+        : null,
+      pendingInventoryVersions: workspace.inventoryVersions
+        .filter((version) => version.status === 'pending')
+        .map((version) => ({ id: version.id, versionNo: version.versionNo, changeSummary: version.changeSummary, submittedBy: version.submittedBy })),
+      reconciliationBatches: workspace.reconciliationBatches.map((batch) => ({
+        id: batch.id,
+        versionId: batch.versionId,
+        status: batch.status,
+        nextIndex: batch.nextIndex,
+        total: batch.items.length,
+        failureReason: batch.failureReason,
+        items: batch.items.map((item) => ({
+          requestCode: item.requestCode,
+          status: item.status,
+          evidenceFrozen: item.evidenceFrozen,
+          tasksGenerated: item.tasksGenerated,
+          tasksBlocked: item.tasksBlocked,
+          detail: item.detail,
+        })),
+      })),
       summary: {
         requestCount: workspace.requests.length,
         openCount: workspace.requests.filter(
           (request) => !['completed', 'rejected'].includes(request.status),
         ).length,
-        systemCount: workspace.systems.length,
+        systemCount: effectiveVersion?.systems.length ?? workspace.systems.length,
+        frozenEvidenceCount: workspace.requests.reduce(
+          (total, request) =>
+            total + request.evidence.filter((evidence) => evidence.frozenAt).length,
+          0,
+        ),
       },
       requests: workspace.requests.map((request) => ({
         code: request.code,
@@ -93,21 +128,26 @@ export function AuditPage() {
           protectedDigest: request.identity.protectedDigest,
           note: request.identity.note,
         },
-        affectedSystems: workspace.systems
+        affectedSystems: (effectiveVersion?.systems ?? workspace.systems)
           .filter((system) => request.affectedSystemIds.includes(system.id))
-          .map((system) => system.name),
+          .map((system) => ({ id: system.id, name: system.name, status: system.status })),
+        inventoryVersionId: request.inventoryVersionId,
+        reconciledVersionId: request.reconciledVersionId,
         tasks: request.tasks.map((task) => ({
           name: task.name,
           status: task.status,
           assignee: task.assignee,
           completedAt: task.completedAt,
           exceptionReason: task.exceptionReason,
+          generatedByVersionId: task.generatedByVersionId,
         })),
         evidence: request.evidence.map((evidence) => ({
           name: evidence.name,
           type: evidence.evidenceType,
           digest: evidence.digest,
           uploadedAt: evidence.uploadedAt,
+          frozenAt: evidence.frozenAt,
+          frozenByVersionId: evidence.frozenByVersionId,
         })),
         conflicts: request.conflicts,
         resultSummary: request.resultSummary,
@@ -236,10 +276,10 @@ export function AuditPage() {
       <Box className="panel">
         <Flex className="panel-title">
           <Heading size="sm">处理包隐私保护</Heading>
-          <Badge colorScheme="green">已校验</Badge>
+          <Badge colorScheme="green">已校验 · 有效版本 {getEffectiveVersion(workspace)?.id ?? '-'}</Badge>
         </Flex>
         <Text color="gray.600" fontSize="sm">
-          导出内容仅包含掩码身份引用、摘要、任务状态、证据元数据和审计记录；系统不会导出原始身份材料。
+          导出内容仅包含掩码身份引用、摘要、任务状态、证据元数据（含发布冻结标记）和审计记录，并标注当前有效清单版本与对账批次；系统不会导出原始身份材料。
         </Text>
       </Box>
     </Box>

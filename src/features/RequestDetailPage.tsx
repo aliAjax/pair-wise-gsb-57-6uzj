@@ -38,7 +38,7 @@ import {
   useDisclosure,
   useToast,
 } from '@chakra-ui/react'
-import { ArrowLeft, FileCheck2, Link2Off, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, FileCheck2, Link2Off, Lock, RefreshCcw, ShieldAlert } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge, TypeBadge } from '@/components/StatusBadge'
 import {
@@ -62,6 +62,7 @@ import {
   type WorkflowStep,
 } from '@/lib/schemas'
 import { deadlineState } from '@/services/workflow'
+import { getEffectiveVersion } from '@/services/reconciliation'
 
 type DialogType =
   | 'edit'
@@ -120,7 +121,18 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
   const deadline = deadlineState(request.dueAt)
   const completedTasks = request.tasks.filter((task) => task.status === 'completed').length
   const currentTask = request.tasks.find((task) => task.status === 'active')
-  const systems = data.systems.filter((system) => request.affectedSystemIds.includes(system.id))
+  const effectiveVersion = getEffectiveVersion(data)
+  const frozenCount = request.evidence.filter((evidence) => evidence.frozenAt).length
+  const regeneratedTasks = request.tasks.filter(
+    (task) =>
+      task.generatedByVersionId &&
+      task.generatedByVersionId !== request.inventoryVersionId &&
+      task.generatedByVersionId === request.reconciledVersionId,
+  )
+  // 详情页的系统卡片按当前有效版本呈现名称与状态。
+  const systems = (effectiveVersion?.systems ?? data.systems).filter((system) =>
+    request.affectedSystemIds.includes(system.id),
+  )
 
   function openDialog(type: DialogType, task?: WorkflowStep, index = 0) {
     if (!request) return
@@ -311,6 +323,16 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
           </>
         }
       />
+
+      <Alert status="info" mb="4" borderRadius="5px">
+        清单版本：登记于 <b>{request.inventoryVersionId ?? '未标记'}</b>
+        {request.reconciledVersionId && request.reconciledVersionId !== request.inventoryVersionId
+          ? `，已对账重算至 ${request.reconciledVersionId}`
+          : ''}
+        {' '}· 当前全局有效版本 <b>{effectiveVersion?.id ?? '-'}</b>
+        {frozenCount ? ` · ${frozenCount} 份证据已随发布冻结，原始回执继续可查` : ''}
+        {regeneratedTasks.length ? ` · ${regeneratedTasks.length} 项任务由版本发布补生成` : ''}
+      </Alert>
 
       <SimpleGrid columns={4} spacing="4" mb="5">
         <Box className="metric">
@@ -532,6 +554,16 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
               {request.tasks.length} 项
             </Text>
           </Flex>
+          {regeneratedTasks.length ? (
+            <Alert status="info" mb="3" borderRadius="5px">
+              <HStack spacing="2">
+                <RefreshCcw size={14} />
+                <Text fontSize="sm">
+                  清单发布重算补生成了 {regeneratedTasks.length} 项任务；原有已完成任务保持原样，未重复生成。
+                </Text>
+              </HStack>
+            </Alert>
+          ) : null}
           <VStack align="stretch" spacing="0">
             {request.tasks.map((task) => (
               <Box
@@ -554,25 +586,33 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
                     ) : null}
                   </Box>
                   <VStack align="flex-end" spacing="2">
-                    <Badge
-                      colorScheme={
-                        task.status === 'completed'
-                          ? 'green'
+                    <HStack>
+                      {task.generatedByVersionId &&
+                      task.generatedByVersionId !== request.inventoryVersionId ? (
+                        <Badge colorScheme="purple" title={`由 ${task.generatedByVersionId} 发布时补生成`}>
+                          补算任务
+                        </Badge>
+                      ) : null}
+                      <Badge
+                        colorScheme={
+                          task.status === 'completed'
+                            ? 'green'
+                            : task.status === 'active'
+                              ? 'blue'
+                              : task.status === 'blocked'
+                                ? 'red'
+                                : 'gray'
+                        }
+                      >
+                        {task.status === 'completed'
+                          ? '已完成'
                           : task.status === 'active'
-                            ? 'blue'
+                            ? '执行中'
                             : task.status === 'blocked'
-                              ? 'red'
-                              : 'gray'
-                      }
-                    >
-                      {task.status === 'completed'
-                        ? '已完成'
-                        : task.status === 'active'
-                          ? '执行中'
-                          : task.status === 'blocked'
-                            ? '已阻断'
-                            : '未开始'}
-                    </Badge>
+                              ? '已阻断'
+                              : '未开始'}
+                      </Badge>
+                    </HStack>
                     <HStack spacing="1">
                       <Button size="xs" variant="ghost" onClick={() => openDialog('assign', task)}>
                         分派
@@ -623,12 +663,25 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
           <VStack align="stretch" spacing="2">
             {request.evidence.map((evidence) => (
               <Box key={evidence.id} className="timeline-item">
-                <Text fontWeight="600">{evidence.name}</Text>
+                <HStack>
+                  <Text fontWeight="600">{evidence.name}</Text>
+                  {evidence.frozenAt ? (
+                    <Badge colorScheme="purple">
+                      <HStack spacing="1">
+                        <Lock size={11} />
+                        <span>已冻结 · {evidence.frozenByVersionId}</span>
+                      </HStack>
+                    </Badge>
+                  ) : null}
+                </HStack>
                 <Text mt="1" color="gray.600" fontSize="xs">
                   {evidence.evidenceType} · {evidence.digest}
                 </Text>
                 <Text mt="1" color="gray.500" fontSize="xs">
                   {evidence.uploadedBy} · {new Date(evidence.uploadedAt).toLocaleString('zh-CN')}
+                  {evidence.frozenAt
+                    ? ` · 冻结于 ${new Date(evidence.frozenAt).toLocaleString('zh-CN')}`
+                    : ''}
                 </Text>
               </Box>
             ))}
@@ -769,9 +822,9 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
                   </FormControl>
                 </Flex>
                 <FormControl>
-                  <FormLabel>相关系统</FormLabel>
+                  <FormLabel>相关系统（当前有效清单版本）</FormLabel>
                   <HStack wrap="wrap">
-                    {data.systems.map((system) => (
+                    {(effectiveVersion?.systems ?? data.systems).map((system) => (
                       <Checkbox
                         key={system.id}
                         isChecked={editForm.affectedSystemIds.includes(system.id)}

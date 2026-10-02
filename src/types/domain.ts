@@ -1,13 +1,17 @@
 export type {
-  DataSystem,
   AuditEntry,
+  DataSystem,
   ExecutionEvidence,
   IdentityCheck,
+  InventoryVersion,
   PrivacyRequest,
+  ReconciliationBatch,
+  ReconciliationItem,
   Region,
   RequestStatus,
   RequestType,
   ReviewComment,
+  SystemChange,
   WorkflowStep,
   WorkspaceState,
 } from '@/lib/schemas'

@@ -2,6 +2,7 @@
 
 import NextLink from 'next/link'
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -24,6 +25,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge, TypeBadge } from '@/components/StatusBadge'
 import { useWorkspaceQuery } from '@/lib/hooks'
 import { deadlineState } from '@/services/workflow'
+import { getEffectiveVersion } from '@/services/reconciliation'
 import { regionLabels } from '@/lib/schemas'
 
 export function DashboardPage() {
@@ -31,6 +33,14 @@ export function DashboardPage() {
 
   if (isLoading || !data) return <Box className="panel">正在加载履约工作区...</Box>
   if (error) return <Box className="panel">工作区加载失败：{error.message}</Box>
+
+  const effectiveVersion = getEffectiveVersion(data)
+  const pendingVersions = data.inventoryVersions.filter((version) => version.status === 'pending')
+  const failedBatches = data.reconciliationBatches.filter((batch) => batch.status === 'failed')
+  const frozenEvidence = data.requests.reduce(
+    (total, request) => total + request.evidence.filter((evidence) => evidence.frozenAt).length,
+    0,
+  )
 
   const openRequests = data.requests.filter(
     (request) => !['completed', 'rejected'].includes(request.status),
@@ -121,6 +131,38 @@ export function DashboardPage() {
         </Box>
       </Box>
 
+      <Box className="panel" mb="4">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="3">
+          <HStack>
+            <Database size={18} color="#237b78" />
+            <Box>
+              <Text fontWeight="700">
+                有效清单版本：v{effectiveVersion?.versionNo ?? '-'}（{effectiveVersion?.id ?? '-'}）
+              </Text>
+              <Text mt="1" color="gray.600" fontSize="xs">
+                总览、请求详情、系统清单与导出包统一按该有效版本呈现；待生效变更发布对账后才切换。
+              </Text>
+            </Box>
+          </HStack>
+          <HStack wrap="wrap">
+            <Badge colorScheme="orange" fontSize="sm">
+              待生效版本 {pendingVersions.length}
+            </Badge>
+            <Badge colorScheme={failedBatches.length ? 'red' : 'gray'} fontSize="sm">
+              中断批次 {failedBatches.length}
+            </Badge>
+            <Badge colorScheme="blue" fontSize="sm">
+              已冻结证据 {frozenEvidence} 份
+            </Badge>
+          </HStack>
+        </Flex>
+        {failedBatches.length ? (
+          <Alert mt="3" status="warning" borderRadius="5px">
+            有发布批次中断并保留了检查点，请前往「系统清单」从检查点续跑，仅补未完成项。
+          </Alert>
+        ) : null}
+      </Box>
+
       <Box className="two-column">
         <Box className="panel">
           <Flex className="panel-title">
@@ -175,7 +217,7 @@ export function DashboardPage() {
         <Box className="panel">
           <Flex className="panel-title">
             <Heading size="sm">履约控制点</Heading>
-            <Badge colorScheme="brand">{data.systems.length} 个系统</Badge>
+            <Badge colorScheme="brand">{effectiveVersion?.systems.length ?? data.systems.length} 个系统 · v{effectiveVersion?.versionNo ?? '-'}</Badge>
           </Flex>
           <VStack align="stretch" spacing="4">
             <Flex gap="12px" align="flex-start">

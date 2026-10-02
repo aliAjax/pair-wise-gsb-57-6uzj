@@ -26,10 +26,13 @@ export function buildWorkflowSteps(params: {
   dueAt: string
   initialStatus: RequestStatus
   systems: DataSystem[]
+  versionId?: string
 }): WorkflowStep[] {
-  const { requestId, type, systemIds, requestedAt, dueAt, initialStatus, systems } = params
+  const { requestId, type, systemIds, requestedAt, dueAt, initialStatus, systems, versionId } = params
+  const stamp = (step: WorkflowStep): WorkflowStep =>
+    versionId ? { ...step, generatedByVersionId: versionId } : step
   const steps: WorkflowStep[] = [
-    {
+    stamp({
       id: `${requestId}-identity`,
       order: 1,
       name: '身份核验与材料保护',
@@ -45,55 +48,62 @@ export function buildWorkflowSteps(params: {
           ? undefined
           : requestedAt,
       exceptionReason: '',
-    },
+    }),
   ]
 
-  const applicableSystems = systems.filter((system) => systemIds.includes(system.id))
-  systemIds.forEach((systemId, index) => {
-    const system = applicableSystems.find((item) => item.id === systemId)
+  // 只有声明支持当前请求类型的系统才生成系统任务；
+  // 例如维护中但不支持“删除”的档案库不应出现删除任务。
+  const applicableSystems = systems.filter(
+    (system) => systemIds.includes(system.id) && system.requestTypes.includes(type),
+  )
+  applicableSystems.forEach((system, index) => {
     const isProcessing = ['processing', 'pending-close', 'completed', 'extended'].includes(
       initialStatus,
     )
-    steps.push({
-      id: `${requestId}-locate-${systemId}`,
-      order: steps.length + 1,
-      name: `定位 ${system?.name ?? systemId} 数据`,
-      role: system?.owner ?? '数据管理员',
-      systemId,
-      status: isProcessing
-        ? initialStatus === 'processing' && index === 0
-          ? 'active'
-          : ['pending-close', 'completed', 'extended'].includes(initialStatus)
-            ? 'completed'
-            : 'pending'
-        : 'pending',
-      assignee: system?.owner ?? '数据管理员',
-      dueAt,
-      completedAt: ['pending-close', 'completed', 'extended'].includes(initialStatus)
-        ? requestedAt
-        : undefined,
-      exceptionReason: '',
-    })
-    steps.push({
-      id: `${requestId}-execute-${systemId}`,
-      order: steps.length + 1,
-      name: `${type === 'deletion' ? '执行删除' : type === 'rectification' ? '执行更正' : '执行请求'}：${system?.name ?? systemId}`,
-      role: system?.owner ?? '数据管理员',
-      systemId,
-      status: ['pending-close', 'completed', 'extended'].includes(initialStatus)
-        ? 'completed'
-        : 'pending',
-      assignee: system?.owner ?? '数据管理员',
-      dueAt,
-      completedAt: ['pending-close', 'completed', 'extended'].includes(initialStatus)
-        ? requestedAt
-        : undefined,
-      exceptionReason: '',
-    })
+    steps.push(
+      stamp({
+        id: `${requestId}-locate-${system.id}`,
+        order: steps.length + 1,
+        name: `定位 ${system?.name ?? system.id} 数据`,
+        role: system?.owner ?? '数据管理员',
+        systemId: system.id,
+        status: isProcessing
+          ? initialStatus === 'processing' && index === 0
+            ? 'active'
+            : ['pending-close', 'completed', 'extended'].includes(initialStatus)
+              ? 'completed'
+              : 'pending'
+          : 'pending',
+        assignee: system?.owner ?? '数据管理员',
+        dueAt,
+        completedAt: ['pending-close', 'completed', 'extended'].includes(initialStatus)
+          ? requestedAt
+          : undefined,
+        exceptionReason: '',
+      }),
+    )
+    steps.push(
+      stamp({
+        id: `${requestId}-execute-${system.id}`,
+        order: steps.length + 1,
+        name: `${type === 'deletion' ? '执行删除' : type === 'rectification' ? '执行更正' : '执行请求'}：${system?.name ?? system.id}`,
+        role: system?.owner ?? '数据管理员',
+        systemId: system.id,
+        status: ['pending-close', 'completed', 'extended'].includes(initialStatus)
+          ? 'completed'
+          : 'pending',
+        assignee: system?.owner ?? '数据管理员',
+        dueAt,
+        completedAt: ['pending-close', 'completed', 'extended'].includes(initialStatus)
+          ? requestedAt
+          : undefined,
+        exceptionReason: '',
+      }),
+    )
   })
 
   steps.push(
-    {
+    stamp({
       id: `${requestId}-merge`,
       order: steps.length + 1,
       name: '合并跨系统处理结果',
@@ -107,8 +117,8 @@ export function buildWorkflowSteps(params: {
         ? requestedAt
         : undefined,
       exceptionReason: '',
-    },
-    {
+    }),
+    stamp({
       id: `${requestId}-review`,
       order: steps.length + 2,
       name: '复核例外、冲突与完整性',
@@ -122,8 +132,8 @@ export function buildWorkflowSteps(params: {
         ? requestedAt
         : undefined,
       exceptionReason: '',
-    },
-    {
+    }),
+    stamp({
       id: `${requestId}-close`,
       order: steps.length + 3,
       name: '确认关闭并生成处理包',
@@ -133,7 +143,7 @@ export function buildWorkflowSteps(params: {
       dueAt,
       completedAt: initialStatus === 'completed' ? requestedAt : undefined,
       exceptionReason: '',
-    },
+    }),
   )
 
   return steps

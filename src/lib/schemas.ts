@@ -41,6 +41,7 @@ export const workflowStepSchema = z.object({
   dueAt: z.string(),
   completedAt: z.string().optional(),
   exceptionReason: z.string(),
+  generatedByVersionId: z.string().optional(),
 })
 
 export const evidenceSchema = z.object({
@@ -52,6 +53,8 @@ export const evidenceSchema = z.object({
   uploadedBy: z.string(),
   uploadedAt: z.string(),
   protected: z.literal(true),
+  frozenAt: z.string().optional(),
+  frozenByVersionId: z.string().optional(),
 })
 
 export const commentSchema = z.object({
@@ -96,6 +99,8 @@ export const privacyRequestSchema = z.object({
   extendedDays: z.number(),
   duplicateOf: z.string().optional(),
   affectedSystemIds: z.array(z.string()),
+  inventoryVersionId: z.string().optional(),
+  reconciledVersionId: z.string().optional(),
   tasks: z.array(workflowStepSchema),
   evidence: z.array(evidenceSchema),
   conflicts: z.array(z.string()),
@@ -106,12 +111,65 @@ export const privacyRequestSchema = z.object({
   ),
 })
 
+export const systemChangeKindSchema = z.enum(['added', 'updated', 'removed'])
+
+export const systemChangeSchema = z.object({
+  kind: systemChangeKindSchema,
+  systemId: z.string(),
+  systemName: z.string(),
+  fields: z.array(z.string()).default([]),
+})
+
+export const inventoryVersionSchema = z.object({
+  id: z.string(),
+  versionNo: z.number().int().nonnegative(),
+  status: z.enum(['draft', 'pending', 'published', 'superseded', 'rejected']),
+  baseVersionId: z.string(),
+  changeSummary: z.string(),
+  systems: z.array(dataSystemSchema),
+  diff: z.array(systemChangeSchema).default([]),
+  submittedBy: z.string(),
+  submittedAt: z.string(),
+  publishedAt: z.string().optional(),
+  publishedBy: z.string().optional(),
+  conflictWithVersionId: z.string().optional(),
+  conflictNote: z.string().optional(),
+})
+
+export const batchItemStatusSchema = z.enum(['pending', 'done', 'skipped'])
+
+export const reconciliationItemSchema = z.object({
+  requestId: z.string(),
+  requestCode: z.string(),
+  status: batchItemStatusSchema,
+  evidenceFrozen: z.number().default(0),
+  tasksGenerated: z.number().default(0),
+  tasksBlocked: z.number().default(0),
+  detail: z.string().default(''),
+  processedAt: z.string().optional(),
+})
+
+export const reconciliationBatchSchema = z.object({
+  id: z.string(),
+  versionId: z.string(),
+  versionNo: z.number().int().nonnegative(),
+  status: z.enum(['processing', 'failed', 'completed']),
+  publishedBy: z.string(),
+  createdAt: z.string(),
+  completedAt: z.string().optional(),
+  failureReason: z.string().optional(),
+  nextIndex: z.number().int().nonnegative().default(0),
+  items: z.array(reconciliationItemSchema),
+})
+
 export const workspaceStateSchema = z.object({
   requests: z.array(privacyRequestSchema),
   systems: z.array(dataSystemSchema),
   comments: z.array(commentSchema),
   audit: z.array(auditEntrySchema),
   revision: z.number(),
+  inventoryVersions: z.array(inventoryVersionSchema).default([]),
+  reconciliationBatches: z.array(reconciliationBatchSchema).default([]),
 })
 
 export const saveRequestInputSchema = z.object({
@@ -215,6 +273,34 @@ export const recordExportInputSchema = z.object({
   operator: z.string(),
 })
 
+export const submitInventoryInputSchema = z.object({
+  state: workspaceStateSchema,
+  baseVersionId: z.string(),
+  changeSummary: z.string().min(4),
+  systems: z.array(dataSystemSchema).min(1),
+  operator: z.string().min(2),
+})
+
+export const publishInventoryInputSchema = z.object({
+  state: workspaceStateSchema,
+  versionId: z.string(),
+  operator: z.string().min(2),
+  simulateFailure: z.boolean().default(false),
+})
+
+export const retryBatchInputSchema = z.object({
+  state: workspaceStateSchema,
+  batchId: z.string(),
+  operator: z.string().min(2),
+  simulateFailure: z.boolean().default(false),
+})
+
+export const discardInventoryInputSchema = z.object({
+  state: workspaceStateSchema,
+  versionId: z.string(),
+  operator: z.string().min(2),
+})
+
 export type RequestType = z.infer<typeof requestTypeSchema>
 export type RequestStatus = z.infer<typeof requestStatusSchema>
 export type Region = z.infer<typeof regionSchema>
@@ -226,6 +312,10 @@ export type AuditEntry = z.infer<typeof auditEntrySchema>
 export type DataSystem = z.infer<typeof dataSystemSchema>
 export type PrivacyRequest = z.infer<typeof privacyRequestSchema>
 export type WorkspaceState = z.infer<typeof workspaceStateSchema>
+export type SystemChange = z.infer<typeof systemChangeSchema>
+export type InventoryVersion = z.infer<typeof inventoryVersionSchema>
+export type ReconciliationBatch = z.infer<typeof reconciliationBatchSchema>
+export type ReconciliationItem = z.infer<typeof reconciliationItemSchema>
 
 export const requestTypeLabels: Record<RequestType, string> = {
   access: '访问',
@@ -257,4 +347,30 @@ export const systemStatusLabels: Record<DataSystem['status'], string> = {
   active: '在用',
   maintenance: '维护中',
   retired: '已退役',
+}
+
+export const inventoryVersionStatusLabels: Record<InventoryVersion['status'], string> = {
+  draft: '冲突草稿',
+  pending: '待生效',
+  published: '有效版本',
+  superseded: '已替代',
+  rejected: '已放弃',
+}
+
+export const systemChangeKindLabels: Record<SystemChange['kind'], string> = {
+  added: '新增',
+  updated: '变更',
+  removed: '退役/移除',
+}
+
+export const batchStatusLabels: Record<ReconciliationBatch['status'], string> = {
+  processing: '对账进行中',
+  failed: '中断待续跑',
+  completed: '发布完成',
+}
+
+export const batchItemStatusLabels: Record<ReconciliationItem['status'], string> = {
+  pending: '待处理',
+  done: '已完成',
+  skipped: '已跳过',
 }

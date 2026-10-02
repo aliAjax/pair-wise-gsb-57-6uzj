@@ -1,5 +1,6 @@
 import type { DataSystem, PrivacyRequest, WorkspaceState } from '@/types/domain'
 import { addDays, buildWorkflowSteps } from './workflow'
+import { BASELINE_VERSION_ID } from './reconciliation'
 
 const systems: DataSystem[] = [
   {
@@ -107,6 +108,8 @@ export function createInitialState(): WorkspaceState {
       dueAt: request1Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-crm', 'sys-order', 'sys-support'],
+      inventoryVersionId: BASELINE_VERSION_ID,
+      reconciledVersionId: BASELINE_VERSION_ID,
       tasks: buildWorkflowSteps({
         requestId: 'req-001',
         type: 'access',
@@ -115,6 +118,7 @@ export function createInitialState(): WorkspaceState {
         dueAt: request1Due,
         initialStatus: 'processing',
         systems,
+        versionId: BASELINE_VERSION_ID,
       }),
       evidence: [
         {
@@ -161,6 +165,8 @@ export function createInitialState(): WorkspaceState {
       extendedDays: 0,
       duplicateOf: 'req-005',
       affectedSystemIds: ['sys-crm', 'sys-marketing', 'sys-support'],
+      inventoryVersionId: BASELINE_VERSION_ID,
+      reconciledVersionId: BASELINE_VERSION_ID,
       tasks: buildWorkflowSteps({
         requestId: 'req-002',
         type: 'deletion',
@@ -169,6 +175,7 @@ export function createInitialState(): WorkspaceState {
         dueAt: request2Due,
         initialStatus: 'review-required',
         systems,
+        versionId: BASELINE_VERSION_ID,
       }),
       evidence: [],
       conflicts: [
@@ -206,15 +213,20 @@ export function createInitialState(): WorkspaceState {
       requestedAt: request3At,
       dueAt: request3Due,
       extendedDays: 0,
-      affectedSystemIds: ['sys-crm', 'sys-risk', 'sys-support'],
+      // sys-order 在基线版本不支持“更正”，因此当前没有订单平台任务；
+      // 待生效版本扩展其支持类型后，发布重算会为该请求补生成缺失任务。
+      affectedSystemIds: ['sys-crm', 'sys-risk', 'sys-support', 'sys-order'],
+      inventoryVersionId: BASELINE_VERSION_ID,
+      reconciledVersionId: BASELINE_VERSION_ID,
       tasks: buildWorkflowSteps({
         requestId: 'req-003',
         type: 'rectification',
-        systemIds: ['sys-crm', 'sys-risk', 'sys-support'],
+        systemIds: ['sys-crm', 'sys-risk', 'sys-support', 'sys-order'],
         requestedAt: request3At,
         dueAt: request3Due,
         initialStatus: 'processing',
         systems,
+        versionId: BASELINE_VERSION_ID,
       }).map((step, index) => (index === 1 ? { ...step, status: 'blocked', exceptionReason: '风控平台返回值与客服系统不一致。' } : step)),
       evidence: [],
       conflicts: ['跨系统结果冲突：客户系统中的姓名已更正，但风控平台仍保留旧值。'],
@@ -250,6 +262,8 @@ export function createInitialState(): WorkspaceState {
       dueAt: request4Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-marketing'],
+      inventoryVersionId: BASELINE_VERSION_ID,
+      reconciledVersionId: BASELINE_VERSION_ID,
       tasks: buildWorkflowSteps({
         requestId: 'req-004',
         type: 'withdraw-consent',
@@ -258,6 +272,7 @@ export function createInitialState(): WorkspaceState {
         dueAt: request4Due,
         initialStatus: 'pending-close',
         systems,
+        versionId: BASELINE_VERSION_ID,
       }),
       evidence: [
         {
@@ -304,6 +319,8 @@ export function createInitialState(): WorkspaceState {
       dueAt: request5Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-crm', 'sys-marketing'],
+      inventoryVersionId: BASELINE_VERSION_ID,
+      reconciledVersionId: BASELINE_VERSION_ID,
       tasks: buildWorkflowSteps({
         requestId: 'req-005',
         type: 'deletion',
@@ -312,6 +329,7 @@ export function createInitialState(): WorkspaceState {
         dueAt: request5Due,
         initialStatus: 'completed',
         systems,
+        versionId: BASELINE_VERSION_ID,
       }),
       evidence: [
         {
@@ -359,7 +377,30 @@ export function createInitialState(): WorkspaceState {
         createdAt: '2026-09-19T02:05:00.000Z',
       },
     ],
+    inventoryVersions: [
+      {
+        id: BASELINE_VERSION_ID,
+        versionNo: 1,
+        status: 'published',
+        baseVersionId: '',
+        changeSummary: '初始系统清单基线：CRM、订单、营销、档案、客服与风控六个系统的处理映射。',
+        systems: systems.map((system) => ({ ...system })),
+        diff: [],
+        submittedBy: '系统初始化',
+        submittedAt: '2026-09-01T00:00:00.000Z',
+        publishedAt: '2026-09-01T00:00:00.000Z',
+        publishedBy: '隐私负责人',
+      },
+    ],
+    reconciliationBatches: [],
     audit: [
+      {
+        id: 'audit-inv-v1-baseline',
+        action: '建立清单有效版本',
+        operator: '系统初始化',
+        detail: 'v1 系统清单版本生效，总览、请求详情、系统清单与导出包均按该版本呈现。',
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
       {
         id: 'audit-global-1',
         requestId: 'req-001',

@@ -20,8 +20,10 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import { PageHeader } from '@/components/PageHeader'
+import { VersionCenter } from '@/components/VersionCenter'
 import { useWorkspaceQuery } from '@/lib/hooks'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { getEffectiveVersion } from '@/services/reconciliation'
 import { requestTypeLabels, systemStatusLabels } from '@/lib/schemas'
 
 export function SystemsPage() {
@@ -30,7 +32,10 @@ export function SystemsPage() {
 
   if (isLoading || !data) return <Box className="panel">正在加载系统清单...</Box>
 
-  const systems = data.systems.filter((system) =>
+  const effectiveVersion = getEffectiveVersion(data)
+  // 系统清单页始终展示当前有效版本的系统（发布完成后才切换）。
+  const systemsSource = effectiveVersion?.systems ?? data.systems
+  const systems = systemsSource.filter((system) =>
     `${system.name}${system.owner}${system.dataDomain}`
       .toLowerCase()
       .includes(store.systemSearch.toLowerCase()),
@@ -43,7 +48,7 @@ export function SystemsPage() {
     <Box>
       <PageHeader
         title="系统清单与处理映射"
-        description="维护隐私数据所在系统、责任团队、传输方式、处理时限和可支持的请求类型。"
+        description="维护隐私数据所在系统、责任团队、传输方式、处理时限和可支持的请求类型。清单变更经待生效版本发布对账后才对总览、请求和导出生效。"
       />
 
       <SimpleGrid columns={4} spacing="4" mb="5">
@@ -52,15 +57,18 @@ export function SystemsPage() {
             系统总数
           </Text>
           <Heading mt="2" size="md">
-            {data.systems.length}
+            {systemsSource.length}
           </Heading>
+          <Text mt="1" color="gray.500" fontSize="xs">
+            有效版本 v{effectiveVersion?.versionNo ?? '-'}
+          </Text>
         </Box>
         <Box className="metric info">
           <Text color="gray.600" fontSize="sm">
             在用系统
           </Text>
           <Heading mt="2" size="md">
-            {data.systems.filter((system) => system.status === 'active').length}
+            {systemsSource.filter((system) => system.status === 'active').length}
           </Heading>
         </Box>
         <Box className="metric warning">
@@ -68,7 +76,7 @@ export function SystemsPage() {
             维护中
           </Text>
           <Heading mt="2" size="md">
-            {data.systems.filter((system) => system.status === 'maintenance').length}
+            {systemsSource.filter((system) => system.status === 'maintenance').length}
           </Heading>
         </Box>
         <Box className="metric danger">
@@ -80,6 +88,8 @@ export function SystemsPage() {
           </Heading>
         </Box>
       </SimpleGrid>
+
+      <VersionCenter />
 
       <Box className="toolbar">
         <Input
@@ -145,7 +155,7 @@ export function SystemsPage() {
           </Button>
         </Flex>
         <SimpleGrid columns={3} spacing="4">
-          {data.systems.map((system) => {
+          {systemsSource.map((system) => {
             const requestCount = activeRequests.filter((request) =>
               request.affectedSystemIds.includes(system.id),
             ).length

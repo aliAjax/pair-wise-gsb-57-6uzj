@@ -6,6 +6,7 @@ import type {
   WorkspaceState,
 } from '@/types/domain'
 import { addDays, buildWorkflowSteps, responseDays } from './workflow'
+import { getEffectiveVersion, migrateState } from './reconciliation'
 
 const cloneState = (state: WorkspaceState): WorkspaceState => structuredClone(state)
 const now = () => new Date().toISOString()
@@ -76,9 +77,11 @@ export function createRequest(
   input: CreateRequestInput,
   operator: string,
 ): WorkspaceState {
-  const draft = cloneState(state)
+  const draft = cloneState(migrateState(state))
   const requestedAt = now()
   const dueAt = addDays(new Date(requestedAt), responseDays[input.region]).toISOString()
+  const effectiveVersion = getEffectiveVersion(draft)
+  const effectiveVersionId = effectiveVersion?.id
   const duplicate = draft.requests.find(
     (request) =>
       request.requesterContact === input.requesterContact &&
@@ -114,6 +117,8 @@ export function createRequest(
     extendedDays: 0,
     duplicateOf: duplicate?.code,
     affectedSystemIds: [...input.affectedSystemIds],
+    inventoryVersionId: effectiveVersionId,
+    reconciledVersionId: effectiveVersionId,
     tasks: buildWorkflowSteps({
       requestId,
       type: input.type,
@@ -122,6 +127,7 @@ export function createRequest(
       dueAt,
       initialStatus: 'identity-review',
       systems: draft.systems,
+      versionId: effectiveVersionId,
     }),
     evidence: [],
     conflicts: [],
