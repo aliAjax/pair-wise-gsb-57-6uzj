@@ -52,6 +52,8 @@ export const evidenceSchema = z.object({
   uploadedBy: z.string(),
   uploadedAt: z.string(),
   protected: z.literal(true),
+  frozenAt: z.string().optional(),
+  frozenByBatchId: z.string().optional(),
 })
 
 export const commentSchema = z.object({
@@ -82,6 +84,55 @@ export const dataSystemSchema = z.object({
   status: z.enum(['active', 'maintenance', 'retired']),
 })
 
+export const inventoryVersionSchema = z.object({
+  id: z.string(),
+  version: z.number(),
+  systems: z.array(dataSystemSchema),
+  status: z.enum(['pending', 'effective', 'superseded']),
+  baseVersionId: z.string().optional(),
+  note: z.string(),
+  createdBy: z.string(),
+  createdAt: z.string(),
+  publishedAt: z.string().optional(),
+  batchId: z.string().optional(),
+})
+
+export const inventoryDraftSchema = z.object({
+  id: z.string(),
+  baseVersionId: z.string(),
+  systems: z.array(dataSystemSchema),
+  note: z.string(),
+  updatedBy: z.string(),
+  updatedAt: z.string(),
+  status: z.enum(['editing', 'conflicted']),
+  conflictSummary: z.array(z.string()).optional(),
+})
+
+export const publishBatchItemSchema = z.object({
+  requestId: z.string(),
+  code: z.string(),
+  status: z.enum(['pending', 'done', 'skipped']),
+  actions: z.array(z.string()),
+})
+
+export const publishBatchSchema = z.object({
+  id: z.string(),
+  versionId: z.string(),
+  version: z.number(),
+  status: z.enum(['running', 'failed', 'completed']),
+  checkpoint: z.number(),
+  items: z.array(publishBatchItemSchema),
+  startedAt: z.string(),
+  finishedAt: z.string().optional(),
+  error: z.string().optional(),
+})
+
+export const inventoryStateSchema = z.object({
+  versions: z.array(inventoryVersionSchema),
+  activeVersionId: z.string(),
+  drafts: z.array(inventoryDraftSchema),
+})
+
 export const privacyRequestSchema = z.object({
   id: z.string(),
   code: z.string(),
@@ -96,6 +147,7 @@ export const privacyRequestSchema = z.object({
   extendedDays: z.number(),
   duplicateOf: z.string().optional(),
   affectedSystemIds: z.array(z.string()),
+  inventoryVersionId: z.string(),
   tasks: z.array(workflowStepSchema),
   evidence: z.array(evidenceSchema),
   conflicts: z.array(z.string()),
@@ -111,6 +163,8 @@ export const workspaceStateSchema = z.object({
   systems: z.array(dataSystemSchema),
   comments: z.array(commentSchema),
   audit: z.array(auditEntrySchema),
+  inventory: inventoryStateSchema,
+  publishBatches: z.array(publishBatchSchema),
   revision: z.number(),
 })
 
@@ -215,6 +269,37 @@ export const recordExportInputSchema = z.object({
   operator: z.string(),
 })
 
+export const saveInventoryDraftInputSchema = z.object({
+  state: workspaceStateSchema,
+  systems: z.array(dataSystemSchema).min(1),
+  note: z.string(),
+  operator: z.string(),
+})
+
+export const inventoryDraftActionInputSchema = z.object({
+  state: workspaceStateSchema,
+  draftId: z.string(),
+  operator: z.string(),
+})
+
+export const withdrawInventoryVersionInputSchema = z.object({
+  state: workspaceStateSchema,
+  operator: z.string(),
+})
+
+export const publishInventoryInputSchema = z.object({
+  state: workspaceStateSchema,
+  operator: z.string(),
+  simulateFailureAfter: z.number().int().nonnegative().optional(),
+})
+
+export const resumePublishBatchInputSchema = z.object({
+  state: workspaceStateSchema,
+  batchId: z.string(),
+  operator: z.string(),
+  simulateFailureAfter: z.number().int().nonnegative().optional(),
+})
+
 export type RequestType = z.infer<typeof requestTypeSchema>
 export type RequestStatus = z.infer<typeof requestStatusSchema>
 export type Region = z.infer<typeof regionSchema>
@@ -226,6 +311,11 @@ export type AuditEntry = z.infer<typeof auditEntrySchema>
 export type DataSystem = z.infer<typeof dataSystemSchema>
 export type PrivacyRequest = z.infer<typeof privacyRequestSchema>
 export type WorkspaceState = z.infer<typeof workspaceStateSchema>
+export type InventoryVersion = z.infer<typeof inventoryVersionSchema>
+export type InventoryDraft = z.infer<typeof inventoryDraftSchema>
+export type InventoryState = z.infer<typeof inventoryStateSchema>
+export type PublishBatch = z.infer<typeof publishBatchSchema>
+export type PublishBatchItem = z.infer<typeof publishBatchItemSchema>
 
 export const requestTypeLabels: Record<RequestType, string> = {
   access: '访问',
@@ -257,4 +347,16 @@ export const systemStatusLabels: Record<DataSystem['status'], string> = {
   active: '在用',
   maintenance: '维护中',
   retired: '已退役',
+}
+
+export const inventoryVersionStatusLabels: Record<InventoryVersion['status'], string> = {
+  pending: '待生效',
+  effective: '生效中',
+  superseded: '已归档',
+}
+
+export const publishBatchStatusLabels: Record<PublishBatch['status'], string> = {
+  running: '发布中',
+  failed: '已中断',
+  completed: '已完成',
 }

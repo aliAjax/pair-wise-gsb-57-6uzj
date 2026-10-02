@@ -25,6 +25,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { useRecordExportMutation, useWorkspaceQuery } from '@/lib/hooks'
 import { clearWorkspace } from '@/lib/localStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { effectiveVersion, versionLabel } from '@/services/inventoryService'
 
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([`\ufeff${content}`], { type })
@@ -66,15 +67,23 @@ export function AuditPage() {
   const workspace = data
 
   function sanitizedPackage() {
+    const effective = effectiveVersion(workspace)
     return {
       exportedAt: new Date().toISOString(),
       policy: '用户隐私权利请求履约操作规范 v1',
+      inventoryVersion: {
+        id: effective.id,
+        version: `v${effective.version}`,
+        status: effective.status,
+        publishedAt: effective.publishedAt,
+      },
       summary: {
         requestCount: workspace.requests.length,
         openCount: workspace.requests.filter(
           (request) => !['completed', 'rejected'].includes(request.status),
         ).length,
         systemCount: workspace.systems.length,
+        inventoryVersion: `v${effective.version}`,
       },
       requests: workspace.requests.map((request) => ({
         code: request.code,
@@ -86,6 +95,7 @@ export function AuditPage() {
         requestedAt: request.requestedAt,
         dueAt: request.dueAt,
         extendedDays: request.extendedDays,
+        inventoryVersion: versionLabel(workspace, request.inventoryVersionId),
         identity: {
           status: request.identity.status,
           materialType: request.identity.materialType,
@@ -108,10 +118,20 @@ export function AuditPage() {
           type: evidence.evidenceType,
           digest: evidence.digest,
           uploadedAt: evidence.uploadedAt,
+          frozen: Boolean(evidence.frozenAt),
+          frozenAt: evidence.frozenAt,
         })),
         conflicts: request.conflicts,
         resultSummary: request.resultSummary,
         closureReason: request.closureReason,
+      })),
+      publishBatches: workspace.publishBatches.map((batch) => ({
+        id: batch.id,
+        version: `v${batch.version}`,
+        status: batch.status,
+        checkpoint: `${batch.checkpoint}/${batch.items.length}`,
+        startedAt: batch.startedAt,
+        finishedAt: batch.finishedAt,
       })),
       audit: auditEntries,
     }

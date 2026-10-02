@@ -19,6 +19,7 @@ import {
   ClipboardList,
   Database,
   FileClock,
+  GitBranch,
   LayoutDashboard,
   ShieldCheck,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/requests', label: '请求工作台', icon: ClipboardList },
   { href: '/review', label: '复核队列', icon: ShieldCheck },
   { href: '/systems', label: '系统清单', icon: Database },
+  { href: '/inventory', label: '版本与发布', icon: GitBranch },
   { href: '/audit', label: '审计与导出', icon: FileClock },
 ]
 

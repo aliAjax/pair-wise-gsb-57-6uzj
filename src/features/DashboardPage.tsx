@@ -2,6 +2,8 @@
 
 import NextLink from 'next/link'
 import {
+  Alert,
+  AlertIcon,
   Badge,
   Box,
   Button,
@@ -24,6 +26,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge, TypeBadge } from '@/components/StatusBadge'
 import { useWorkspaceQuery } from '@/lib/hooks'
 import { deadlineState } from '@/services/workflow'
+import { effectiveVersion, pendingVersion } from '@/services/inventoryService'
 import { regionLabels } from '@/lib/schemas'
 
 export function DashboardPage() {
@@ -53,12 +56,15 @@ export function DashboardPage() {
   const sorted = [...openRequests].sort(
     (left, right) => new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime(),
   )
+  const effective = effectiveVersion(data)
+  const pending = pendingVersion(data)
+  const failedBatch = data.publishBatches.find((batch) => batch.status === 'failed')
 
   return (
     <Box>
       <PageHeader
         title="履约运行总览"
-        description="汇总请求期限、身份核验、跨系统执行、冲突复核和操作审计。"
+        description={`汇总请求期限、身份核验、跨系统执行、冲突复核和操作审计。当前清单有效版本 v${effective.version}，各视图与导出包均认同该版本。`}
         actions={
           <>
             <NextLink href="/review">
@@ -70,6 +76,30 @@ export function DashboardPage() {
           </>
         }
       />
+
+      {failedBatch ? (
+        <Alert status="error" mb="4" borderRadius="5px">
+          <AlertIcon />
+          <Box flex="1">
+            <Text fontWeight="600">清单 v{failedBatch.version} 发布批次中断</Text>
+            <Text fontSize="sm">{failedBatch.error}</Text>
+          </Box>
+          <NextLink href="/inventory">
+            <Button size="sm" colorScheme="red">前往检查点重试</Button>
+          </NextLink>
+        </Alert>
+      ) : null}
+      {!failedBatch && pending ? (
+        <Alert status="warning" mb="4" borderRadius="5px">
+          <AlertIcon />
+          <Box flex="1">
+            <Text fontSize="sm">清单 v{pending.version} 待生效，发布后将重算受影响的请求任务。</Text>
+          </Box>
+          <NextLink href="/inventory">
+            <Button size="sm" variant="outline">前往发布</Button>
+          </NextLink>
+        </Alert>
+      ) : null}
 
       <Box className="metric-grid">
         <Box className="metric info">
@@ -175,7 +205,10 @@ export function DashboardPage() {
         <Box className="panel">
           <Flex className="panel-title">
             <Heading size="sm">履约控制点</Heading>
-            <Badge colorScheme="brand">{data.systems.length} 个系统</Badge>
+            <HStack>
+              <Badge colorScheme="green">清单 v{effective.version}</Badge>
+              <Badge colorScheme="brand">{data.systems.length} 个系统</Badge>
+            </HStack>
           </Flex>
           <VStack align="stretch" spacing="4">
             <Flex gap="12px" align="flex-start">

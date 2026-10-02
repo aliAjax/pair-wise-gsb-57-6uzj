@@ -5,6 +5,7 @@ import type {
   RequestType,
   WorkspaceState,
 } from '@/types/domain'
+import { normalizeWorkspace } from './inventoryService'
 import { addDays, buildWorkflowSteps, responseDays } from './workflow'
 
 const cloneState = (state: WorkspaceState): WorkspaceState => structuredClone(state)
@@ -76,7 +77,7 @@ export function createRequest(
   input: CreateRequestInput,
   operator: string,
 ): WorkspaceState {
-  const draft = cloneState(state)
+  const draft = cloneState(normalizeWorkspace(state))
   const requestedAt = now()
   const dueAt = addDays(new Date(requestedAt), responseDays[input.region]).toISOString()
   const duplicate = draft.requests.find(
@@ -114,6 +115,7 @@ export function createRequest(
     extendedDays: 0,
     duplicateOf: duplicate?.code,
     affectedSystemIds: [...input.affectedSystemIds],
+    inventoryVersionId: draft.inventory.activeVersionId,
     tasks: buildWorkflowSteps({
       requestId,
       type: input.type,

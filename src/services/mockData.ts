@@ -107,6 +107,7 @@ export function createInitialState(): WorkspaceState {
       dueAt: request1Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-crm', 'sys-order', 'sys-support'],
+      inventoryVersionId: 'inv-v1',
       tasks: buildWorkflowSteps({
         requestId: 'req-001',
         type: 'access',
@@ -161,6 +162,7 @@ export function createInitialState(): WorkspaceState {
       extendedDays: 0,
       duplicateOf: 'req-005',
       affectedSystemIds: ['sys-crm', 'sys-marketing', 'sys-support'],
+      inventoryVersionId: 'inv-v1',
       tasks: buildWorkflowSteps({
         requestId: 'req-002',
         type: 'deletion',
@@ -207,6 +209,7 @@ export function createInitialState(): WorkspaceState {
       dueAt: request3Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-crm', 'sys-risk', 'sys-support'],
+      inventoryVersionId: 'inv-v1',
       tasks: buildWorkflowSteps({
         requestId: 'req-003',
         type: 'rectification',
@@ -250,6 +253,7 @@ export function createInitialState(): WorkspaceState {
       dueAt: request4Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-marketing'],
+      inventoryVersionId: 'inv-v1',
       tasks: buildWorkflowSteps({
         requestId: 'req-004',
         type: 'withdraw-consent',
@@ -304,6 +308,7 @@ export function createInitialState(): WorkspaceState {
       dueAt: request5Due,
       extendedDays: 0,
       affectedSystemIds: ['sys-crm', 'sys-marketing'],
+      inventoryVersionId: 'inv-v1',
       tasks: buildWorkflowSteps({
         requestId: 'req-005',
         type: 'deletion',
@@ -343,6 +348,23 @@ export function createInitialState(): WorkspaceState {
   return {
     requests,
     systems,
+    inventory: {
+      versions: [
+        {
+          id: 'inv-v1',
+          version: 1,
+          systems: structuredClone(systems),
+          status: 'effective',
+          note: '初始系统清单版本',
+          createdBy: '数据治理负责人',
+          createdAt: '2026-09-01T00:00:00.000Z',
+          publishedAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+      activeVersionId: 'inv-v1',
+      drafts: [],
+    },
+    publishBatches: [],
     comments: [
       {
         id: 'comment-001',

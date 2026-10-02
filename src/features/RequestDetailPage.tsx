@@ -61,6 +61,7 @@ import {
   type RequestType,
   type WorkflowStep,
 } from '@/lib/schemas'
+import { versionLabel } from '@/services/inventoryService'
 import { deadlineState } from '@/services/workflow'
 
 type DialogType =
@@ -121,6 +122,9 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
   const completedTasks = request.tasks.filter((task) => task.status === 'completed').length
   const currentTask = request.tasks.find((task) => task.status === 'active')
   const systems = data.systems.filter((system) => request.affectedSystemIds.includes(system.id))
+  const alignedVersion = versionLabel(data, request.inventoryVersionId)
+  const activeVersion = versionLabel(data, data.inventory.activeVersionId)
+  const versionStale = request.inventoryVersionId !== data.inventory.activeVersionId
 
   function openDialog(type: DialogType, task?: WorkflowStep, index = 0) {
     if (!request) return
@@ -449,7 +453,13 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
         <Box className="panel">
           <Flex className="panel-title">
             <Heading size="sm">涉及系统与流程模板</Heading>
-            <Badge colorScheme="blue">{systems.length} 个系统</Badge>
+            <HStack>
+              <Badge colorScheme={versionStale ? 'orange' : 'green'}>
+                清单 {alignedVersion}
+                {versionStale ? ' · 待重算对齐' : ' · 与有效版本一致'}
+              </Badge>
+              <Badge colorScheme="blue">{systems.length} 个系统</Badge>
+            </HStack>
           </Flex>
           <VStack align="stretch" spacing="3">
             {systems.map((system) => (
@@ -623,7 +633,14 @@ export function RequestDetailPage({ requestId }: { requestId: string }) {
           <VStack align="stretch" spacing="2">
             {request.evidence.map((evidence) => (
               <Box key={evidence.id} className="timeline-item">
-                <Text fontWeight="600">{evidence.name}</Text>
+                <Flex justify="space-between" align="center">
+                  <Text fontWeight="600">{evidence.name}</Text>
+                  {evidence.frozenAt ? (
+                    <Badge colorScheme="purple" title={`批次 ${evidence.frozenByBatchId}`}>
+                      已冻结
+                    </Badge>
+                  ) : null}
+                </Flex>
                 <Text mt="1" color="gray.600" fontSize="xs">
                   {evidence.evidenceType} · {evidence.digest}
                 </Text>

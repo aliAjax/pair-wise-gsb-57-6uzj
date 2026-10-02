@@ -1,6 +1,8 @@
 'use client'
 
+import NextLink from 'next/link'
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -19,10 +21,12 @@ import {
   Tr,
   VStack,
 } from '@chakra-ui/react'
+import { GitBranch } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { useWorkspaceQuery } from '@/lib/hooks'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { requestTypeLabels, systemStatusLabels } from '@/lib/schemas'
+import { effectiveVersion, pendingVersion } from '@/services/inventoryService'
 
 export function SystemsPage() {
   const { data, isLoading } = useWorkspaceQuery()
@@ -30,6 +34,8 @@ export function SystemsPage() {
 
   if (isLoading || !data) return <Box className="panel">正在加载系统清单...</Box>
 
+  const effective = effectiveVersion(data)
+  const pending = pendingVersion(data)
   const systems = data.systems.filter((system) =>
     `${system.name}${system.owner}${system.dataDomain}`
       .toLowerCase()
@@ -43,8 +49,26 @@ export function SystemsPage() {
     <Box>
       <PageHeader
         title="系统清单与处理映射"
-        description="维护隐私数据所在系统、责任团队、传输方式、处理时限和可支持的请求类型。"
+        description={`当前展示有效版本 v${effective.version} 的系统清单；清单修改通过「版本与发布」提交待生效版本后发布生效。`}
+        actions={
+          <>
+            <Badge colorScheme="green" alignSelf="center" px="3" py="1">
+              有效版本 v{effective.version}
+            </Badge>
+            <NextLink href="/inventory">
+              <Button size="sm" variant="outline" leftIcon={<GitBranch size={15} />}>
+                版本与发布
+              </Button>
+            </NextLink>
+          </>
+        }
       />
+
+      {pending ? (
+        <Alert status="warning" mb="4" borderRadius="5px">
+          清单 v{pending.version} 已由 {pending.createdBy} 提交待生效，发布后本页将切换为新版本清单。
+        </Alert>
+      ) : null}
 
       <SimpleGrid columns={4} spacing="4" mb="5">
         <Box className="metric">

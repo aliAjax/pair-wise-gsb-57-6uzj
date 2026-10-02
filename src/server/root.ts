@@ -1,5 +1,15 @@
 import { TRPCError, initTRPC } from '@trpc/server'
 import {
+  discardInventoryDraft,
+  normalizeWorkspace,
+  publishInventoryVersion,
+  rebaseInventoryDraft,
+  resumePublishBatch,
+  saveInventoryDraft,
+  submitInventoryDraft,
+  withdrawInventoryVersion,
+} from '@/services/inventoryService'
+import {
   addComment,
   addConflict,
   addEvidence,
@@ -23,10 +33,15 @@ import {
   evidenceInputSchema,
   extendRequestInputSchema,
   identityInputSchema,
+  inventoryDraftActionInputSchema,
+  publishInventoryInputSchema,
   recordExportInputSchema,
   resolveConflictInputSchema,
+  resumePublishBatchInputSchema,
+  saveInventoryDraftInputSchema,
   saveRequestInputSchema,
   taskActionInputSchema,
+  withdrawInventoryVersionInputSchema,
 } from '@/lib/schemas'
 import type { WorkspaceState } from '@/types/domain'
 
@@ -165,6 +180,54 @@ export const appRouter = t.router({
       .mutation(({ input }) =>
         execute(() =>
           recordExport(input.state, input.scope, input.count, input.operator),
+        ),
+      ),
+  }),
+  inventory: t.router({
+    saveDraft: publicProcedure
+      .input(saveInventoryDraftInputSchema)
+      .mutation(({ input }) =>
+        execute(() =>
+          saveInventoryDraft(input.state, input.systems, input.note, input.operator),
+        ),
+      ),
+    submitDraft: publicProcedure
+      .input(inventoryDraftActionInputSchema)
+      .mutation(({ input }) =>
+        execute(() => submitInventoryDraft(input.state, input.draftId, input.operator)),
+      ),
+    rebaseDraft: publicProcedure
+      .input(inventoryDraftActionInputSchema)
+      .mutation(({ input }) =>
+        execute(() => rebaseInventoryDraft(input.state, input.draftId, input.operator)),
+      ),
+    discardDraft: publicProcedure
+      .input(inventoryDraftActionInputSchema)
+      .mutation(({ input }) =>
+        execute(() => discardInventoryDraft(input.state, input.draftId, input.operator)),
+      ),
+    withdrawVersion: publicProcedure
+      .input(withdrawInventoryVersionInputSchema)
+      .mutation(({ input }) =>
+        execute(() => withdrawInventoryVersion(input.state, input.operator)),
+      ),
+    publish: publicProcedure
+      .input(publishInventoryInputSchema)
+      .mutation(({ input }) =>
+        execute(() =>
+          publishInventoryVersion(input.state, input.operator, input.simulateFailureAfter),
+        ),
+      ),
+    resumeBatch: publicProcedure
+      .input(resumePublishBatchInputSchema)
+      .mutation(({ input }) =>
+        execute(() =>
+          resumePublishBatch(
+            input.state,
+            input.batchId,
+            input.operator,
+            input.simulateFailureAfter,
+          ),
         ),
       ),
   }),

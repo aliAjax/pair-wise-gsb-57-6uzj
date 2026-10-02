@@ -135,4 +135,53 @@ export function useRecordExportMutation() {
   )
 }
 
+export function useSaveInventoryDraftMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.saveDraft.mutate>[0], 'state'>, state) =>
+      trpc.inventory.saveDraft.mutate({ ...input, state }),
+  )
+}
+
+export function useSubmitInventoryDraftMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.submitDraft.mutate>[0], 'state'>, state) =>
+      trpc.inventory.submitDraft.mutate({ ...input, state }),
+  )
+}
+
+export function useRebaseInventoryDraftMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.rebaseDraft.mutate>[0], 'state'>, state) =>
+      trpc.inventory.rebaseDraft.mutate({ ...input, state }),
+  )
+}
+
+export function useDiscardInventoryDraftMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.discardDraft.mutate>[0], 'state'>, state) =>
+      trpc.inventory.discardDraft.mutate({ ...input, state }),
+  )
+}
+
+export function useWithdrawInventoryVersionMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.withdrawVersion.mutate>[0], 'state'>, state) =>
+      trpc.inventory.withdrawVersion.mutate({ ...input, state }),
+  )
+}
+
+export function usePublishInventoryMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.publish.mutate>[0], 'state'>, state) =>
+      trpc.inventory.publish.mutate({ ...input, state }),
+  )
+}
+
+export function useResumePublishBatchMutation() {
+  return useWorkspaceMutation(
+    (input: Omit<Parameters<typeof trpc.inventory.resumeBatch.mutate>[0], 'state'>, state) =>
+      trpc.inventory.resumeBatch.mutate({ ...input, state }),
+  )
+}
+
 export type { PrivacyRequest }
